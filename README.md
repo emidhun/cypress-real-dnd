@@ -4,13 +4,20 @@ Real HTML5 drag-and-drop for Cypress, driven by Chrome DevTools Protocol.
 
 Companion to [`cypress-real-events`](https://github.com/dmtrKovalenko/cypress-real-events) — that one does mouse/keyboard, this does drag.
 
-Works out of the box with:
-- [`react-dnd`](https://github.com/react-dnd/react-dnd) (html5 backend)
-- [`react-beautiful-dnd`](https://github.com/atlassian/react-beautiful-dnd) (html5 mode)
-- [`dnd-kit`](https://github.com/clauderic/dnd-kit) (html5 sensor)
-- plain HTML5 `draggable="true"` elements
+**Works with anything built on the browser's HTML5 drag-and-drop API:**
+- [`react-dnd`](https://github.com/react-dnd/react-dnd) (html5 backend — the default)
+- [Sortable.js](https://github.com/SortableJS/Sortable) (and `vue.draggable`, `react-sortablejs`, etc.)
+- [`dnd-kit`](https://github.com/clauderic/dnd-kit) when configured with its html5 sensor
+- Angular CDK `DragDropModule` (HTML5 events under the hood)
+- Plain HTML5 `draggable="true"` elements
+- File-drop zones (in-app DOM drops)
 
-This plugin sits next to [`cypress-real-events`](https://github.com/dmtrKovalenko/cypress-real-events) — they don't have drag; this fills the gap. Commands follow the `cy.real*` convention.
+**Does NOT work with mouse/pointer-event drag libraries** (those don't fire `dragstart`):
+- `react-beautiful-dnd` (default mode uses mousedown/mousemove)
+- `dnd-kit` with its default `PointerSensor`
+- Custom drag rolled with mousedown/mousemove/mouseup
+
+For those, use [`cypress-real-events`](https://github.com/dmtrKovalenko/cypress-real-events)' `realMouseDown` / `realMouseMove` / `realMouseUp`. The two plugins are complementary — commands here follow the same `cy.real*` convention.
 
 ## Why?
 
@@ -92,10 +99,39 @@ describe("Kanban board", () => {
 |---|---|---|---|
 | `sourceSelector` | `string` | — | CSS selector for the drag source |
 | `targetSelector` | `string` | — | CSS selector for the drop target |
-| `options.sourceX` | `number` | source width / 2 | X offset inside the source |
-| `options.sourceY` | `number` | source height / 2 | Y offset inside the source |
-| `options.targetX` | `number` | target width / 2 | X offset inside the target |
-| `options.targetY` | `number` | target height / 2 | Y offset inside the target |
+| `options.sourcePosition` | `RealDndPosition` | `'center'` | Keyword for where in the source to start. |
+| `options.targetPosition` | `RealDndPosition` | `'center'` | Keyword for where in the target to drop. |
+| `options.sourceX` | `number` | — | Precise X offset inside source (**overrides** `sourcePosition`). |
+| `options.sourceY` | `number` | — | Precise Y offset inside source (**overrides** `sourcePosition`). |
+| `options.targetX` | `number` | — | Precise X offset inside target (**overrides** `targetPosition`). |
+| `options.targetY` | `number` | — | Precise Y offset inside target (**overrides** `targetPosition`). |
+
+**Position keywords** (same set as `cypress-real-events`):
+`topLeft`, `top`, `topRight`, `left`, `center`, `right`, `bottomLeft`, `bottom`, `bottomRight`.
+
+```js
+// Default: center → center
+cy.realDragAndDrop('[data-cy=card]', '[data-cy=col]');
+
+// Cypress-style position keywords
+cy.realDragAndDrop('[data-cy=card]', '[data-cy=col]', {
+  sourcePosition: 'center',
+  targetPosition: 'topLeft',
+});
+
+// Precise pixel offsets (e.g. canvas grid)
+cy.realDragAndDrop('[data-cy=card]', '[data-cy=canvas]', {
+  targetX: 250,
+  targetY: 400,
+});
+
+// Mix: keyword for source, precise pixels for target
+cy.realDragAndDrop('[data-cy=card]', '[data-cy=canvas]', {
+  sourcePosition: 'center',
+  targetX: 250,
+  targetY: 400,
+});
+```
 
 ### `cy.realDrag({ fromX, fromY, toX, toY })`
 

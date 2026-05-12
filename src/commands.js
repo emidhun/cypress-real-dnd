@@ -16,21 +16,71 @@
  *     cy.realDragAndDrop('[data-cy=card-1]', '[data-cy=column-done]');
  *   });
  *
+ *   // With Cypress-style position keywords:
+ *   cy.realDragAndDrop('[data-cy=card]', '[data-cy=col]', {
+ *     sourcePosition: 'center',
+ *     targetPosition: 'topLeft',
+ *   });
+ *
+ *   // With precise pixel offsets inside each element:
+ *   cy.realDragAndDrop('[data-cy=card]', '[data-cy=canvas]', {
+ *     targetX: 250,
+ *     targetY: 400,
+ *   });
+ *
  *   // Lower-level coord-based API:
  *   cy.realDrag({ fromX: 100, fromY: 200, toX: 600, toY: 400 });
  */
 
+// Position keywords mirror cypress-real-events' `position` option so users
+// can move between the two plugins without re-learning the API.
+const POSITION_KEYWORDS = {
+  topLeft:     (r) => [0,         0],
+  top:         (r) => [r.width/2, 0],
+  topRight:    (r) => [r.width,   0],
+  left:        (r) => [0,         r.height/2],
+  center:      (r) => [r.width/2, r.height/2],
+  right:       (r) => [r.width,   r.height/2],
+  bottomLeft:  (r) => [0,         r.height],
+  bottom:      (r) => [r.width/2, r.height],
+  bottomRight: (r) => [r.width,   r.height],
+};
+
+function resolveOffset(rect, position, explicitX, explicitY) {
+  // Explicit pixel offsets win when provided — most specific wins.
+  if (explicitX !== undefined || explicitY !== undefined) {
+    return [
+      explicitX !== undefined ? explicitX : rect.width / 2,
+      explicitY !== undefined ? explicitY : rect.height / 2,
+    ];
+  }
+  if (position) {
+    const fn = POSITION_KEYWORDS[position];
+    if (!fn) {
+      throw new Error(
+        `[cypress-real-dnd] Unknown position "${position}". ` +
+          `Valid: ${Object.keys(POSITION_KEYWORDS).join(", ")}.`,
+      );
+    }
+    return fn(rect);
+  }
+  return [rect.width / 2, rect.height / 2];
+}
+
 /**
- * High-level: drag from one selector's center to another selector's center
- * (or to a specific position inside the target).
+ * High-level: drag from a source selector to a target selector.
  *
  * @param {string} sourceSelector  CSS selector for the drag source.
  * @param {string} targetSelector  CSS selector for the drop target.
  * @param {object} [options]
- * @param {number} [options.targetX]  X offset inside the target (defaults to center).
- * @param {number} [options.targetY]  Y offset inside the target (defaults to center).
- * @param {number} [options.sourceX]  X offset inside the source (defaults to center).
- * @param {number} [options.sourceY]  Y offset inside the source (defaults to center).
+ * @param {('topLeft'|'top'|'topRight'|'left'|'center'|'right'|'bottomLeft'|'bottom'|'bottomRight')} [options.sourcePosition='center']
+ *   Where inside the source the drag starts. Cypress-style keyword.
+ * @param {('topLeft'|'top'|'topRight'|'left'|'center'|'right'|'bottomLeft'|'bottom'|'bottomRight')} [options.targetPosition='center']
+ *   Where inside the target the drop lands. Cypress-style keyword.
+ * @param {number} [options.sourceX]  Precise X offset inside the source (overrides sourcePosition).
+ * @param {number} [options.sourceY]  Precise Y offset inside the source (overrides sourcePosition).
+ * @param {number} [options.targetX]  Precise X offset inside the target (overrides targetPosition).
+ * @param {number} [options.targetY]  Precise Y offset inside the target (overrides targetPosition).
  */
 Cypress.Commands.add(
   "realDragAndDrop",
@@ -39,17 +89,28 @@ Cypress.Commands.add(
       cy.get(targetSelector).then(($target) => {
         const s = $source[0].getBoundingClientRect();
         const t = $target[0].getBoundingClientRect();
-        const fromX = Math.round(
-          s.left + (options.sourceX ?? s.width / 2),
+
+        const [sOffX, sOffY] = resolveOffset(
+          s,
+          options.sourcePosition,
+          options.sourceX,
+          options.sourceY,
         );
-        const fromY = Math.round(
-          s.top + (options.sourceY ?? s.height / 2),
+        const [tOffX, tOffY] = resolveOffset(
+          t,
+          options.targetPosition,
+          options.targetX,
+          options.targetY,
         );
-        const toX = Math.round(t.left + (options.targetX ?? t.width / 2));
-        const toY = Math.round(t.top + (options.targetY ?? t.height / 2));
+
         cy.task(
           "cdpRealDrag",
-          { fromX, fromY, toX, toY },
+          {
+            fromX: Math.round(s.left + sOffX),
+            fromY: Math.round(s.top + sOffY),
+            toX:   Math.round(t.left + tOffX),
+            toY:   Math.round(t.top + tOffY),
+          },
           { timeout: 15000 },
         );
       });
