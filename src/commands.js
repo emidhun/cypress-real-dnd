@@ -32,11 +32,10 @@
  *   cy.realDrag({ fromX: 100, fromY: 200, toX: 600, toY: 400 });
  */
 
-// Position keywords mirror cypress-real-events' `position` option so users
-// can move between the two plugins without re-learning the API.
-// A 1px inset on the right/bottom edges keeps drops inside the element's
-// hit-test box — CSS treats `right` and `bottom` as exclusive, so a literal
-// corner coord lands on the next element underneath.
+// Standard Cypress 9-keyword position set. A 1px inset on the right/bottom
+// edges keeps drops inside the element's hit-test box — CSS treats `right`
+// and `bottom` as exclusive, so a literal corner coord lands on the next
+// element underneath.
 const POSITION_KEYWORDS = {
   topLeft:     (r) => [0,             0],
   top:         (r) => [r.width / 2,   0],

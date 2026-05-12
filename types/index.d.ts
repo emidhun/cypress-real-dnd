@@ -1,7 +1,6 @@
 declare namespace Cypress {
   /**
-   * Position keyword inside an element, mirroring `cypress-real-events`'
-   * `position` option.
+   * Position keyword inside an element. Standard Cypress 9-keyword set.
    */
   type RealDndPosition =
     | "topLeft"
@@ -45,9 +44,10 @@ declare namespace Cypress {
   interface Chainable<Subject> {
     /**
      * Real HTML5 drag-and-drop from one selector to another, driven by Chrome
-     * DevTools Protocol. Triggers the same drag pipeline a human user would,
-     * so it works with `react-dnd`, `dnd-kit`'s html5 sensor, Sortable.js,
-     * and any plain HTML5 `draggable="true"` element.
+     * DevTools Protocol. Triggers the actual `dragstart` → `dragover` → `drop`
+     * pipeline a human user does — so it works with `react-dnd`, Sortable.js,
+     * `dnd-kit`'s html5 sensor, and any plain HTML5 `draggable="true"`
+     * element, where synthetic-event plugins do not.
      *
      * Pair with `cy.task('cdpRealDragInit')` in a `before()` hook so the
      * first drag of the spec lands on a settled CDP state.

@@ -2,30 +2,37 @@
 
 Real HTML5 drag-and-drop for Cypress, driven by Chrome DevTools Protocol.
 
-Companion to [`cypress-real-events`](https://github.com/dmtrKovalenko/cypress-real-events) — that one does mouse/keyboard, this does drag.
+## The problem this solves
 
-**Works with anything built on the browser's HTML5 drag-and-drop API:**
-- [`react-dnd`](https://github.com/react-dnd/react-dnd) (html5 backend — the default)
-- [Sortable.js](https://github.com/SortableJS/Sortable) (and `vue.draggable`, `react-sortablejs`, etc.)
-- [`dnd-kit`](https://github.com/clauderic/dnd-kit) when configured with its html5 sensor
+HTML5 drag-and-drop has been broken in Cypress for years. Existing plugins claim to fix it; none of them actually do for the libraries people use.
+
+| Existing approach | What it does | Why it doesn't work |
+|---|---|---|
+| Cypress's `cy.trigger("dragstart", ...)` | Synthetic `dispatchEvent` | Doesn't enter the browser's HTML5 drag pipeline. `react-dnd-html5-backend`'s monitor never fires. |
+| [`cypress-drag-drop`](https://github.com/4teamwork/cypress-drag-drop) | Dispatches synthetic `new DragEvent(...)` | Same — synthetic events don't drive the HTML5 backend. Issues confirming this against react-dnd have been open for years. |
+| [`cypress-real-events`](https://github.com/dmtrKovalenko/cypress-real-events) | Real OS-level mouse events via CDP | Real mouse events alone don't initiate an HTML5 drag in Chromium. The maintainer has confirmed drag is out of scope. |
+| `react-dnd-test-backend` (swap backends in tests) | Test-only backend | Couples test infrastructure to product code. Doesn't generalize across libraries. |
+
+This plugin uses the same primitive Puppeteer uses for real drag: CDP's `Input.setInterceptDrags` + `Input.dragIntercepted` event + `Input.dispatchDragEvent`. Chromium initiates a real HTML5 drag; we capture and replay it at the target. Same path a human user takes.
+
+## Works with anything built on the browser's HTML5 drag API
+
+- [`react-dnd`](https://github.com/react-dnd/react-dnd) with the html5 backend (the default)
+- [Sortable.js](https://github.com/SortableJS/Sortable) and its wrappers (`vue.draggable`, `react-sortablejs`, …)
+- [`dnd-kit`](https://github.com/clauderic/dnd-kit) when configured with an HTML5 sensor
 - Angular CDK `DragDropModule` (HTML5 events under the hood)
 - Plain HTML5 `draggable="true"` elements
-- File-drop zones (in-app DOM drops)
+- In-app file-drop zones
 
-**Does NOT work with mouse/pointer-event drag libraries** (those don't fire `dragstart`):
-- `react-beautiful-dnd` (default mode uses mousedown/mousemove)
-- `dnd-kit` with its default `PointerSensor`
-- Custom drag rolled with mousedown/mousemove/mouseup
+## Does NOT work with mouse/pointer-event drag libraries
 
-For those, use [`cypress-real-events`](https://github.com/dmtrKovalenko/cypress-real-events)' `realMouseDown` / `realMouseMove` / `realMouseUp`. The two plugins are complementary — commands here follow the same `cy.real*` convention.
+These never fire `dragstart` — they listen to `mousedown` + `mousemove` directly:
 
-## Why?
+- `react-beautiful-dnd` (default mouse mode)
+- `dnd-kit` with the default `PointerSensor` / `MouseSensor`
+- Custom drag rolled with `mousedown` / `mousemove` / `mouseup`
 
-Cypress's built-in `cy.trigger("dragstart")` is a **synthetic** `dispatchEvent` — it doesn't enter the browser's HTML5 drag-and-drop pipeline, so libraries that hook the real `dragstart` (like `react-dnd-html5-backend`) never wake up.
-
-`cypress-real-events` fires real OS-level mouse events, but the browser does **not** autonomously start an HTML5 drag from mouse events alone.
-
-The only path to a real drag in Cypress is what Puppeteer does: enable CDP drag interception, capture the `Input.dragIntercepted` event, then replay `dragEnter / dragOver / drop` at the target via `Input.dispatchDragEvent`. That's what this plugin does.
+For those, use `cypress-real-events`' `realMouseDown` / `realMouseMove` / `realMouseUp`. The two libraries solve different problems — neither is a superset of the other.
 
 ## Install
 
@@ -106,7 +113,7 @@ describe("Kanban board", () => {
 | `options.targetX` | `number` | — | Precise X offset inside target (**overrides** `targetPosition`). |
 | `options.targetY` | `number` | — | Precise Y offset inside target (**overrides** `targetPosition`). |
 
-**Position keywords** (same set as `cypress-real-events`):
+**Position keywords:**
 `topLeft`, `top`, `topRight`, `left`, `center`, `right`, `bottomLeft`, `bottom`, `bottomRight`.
 
 ```js
