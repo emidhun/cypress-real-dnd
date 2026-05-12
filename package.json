@@ -1,0 +1,52 @@
+{
+  "name": "cypress-real-drag-drop",
+  "version": "0.1.0",
+  "description": "Real HTML5 drag-and-drop for Cypress via Chrome DevTools Protocol. Works with react-dnd, react-beautiful-dnd, dnd-kit's html5 sensor, and plain HTML5 draggables.",
+  "main": "src/index.js",
+  "types": "types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "require": "./src/index.js"
+    },
+    "./plugin": {
+      "types": "./types/plugin.d.ts",
+      "require": "./src/plugin.js"
+    },
+    "./commands": {
+      "types": "./types/commands.d.ts",
+      "require": "./src/commands.js"
+    }
+  },
+  "files": [
+    "src",
+    "types",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "echo 'See examples/ for a working react-dnd self-test'"
+  },
+  "keywords": [
+    "cypress",
+    "cypress-plugin",
+    "drag",
+    "drop",
+    "drag-and-drop",
+    "html5",
+    "react-dnd",
+    "cdp",
+    "chrome-devtools-protocol"
+  ],
+  "author": "",
+  "license": "MIT",
+  "peerDependencies": {
+    "cypress": ">=12"
+  },
+  "dependencies": {
+    "chrome-remote-interface": "^0.34.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

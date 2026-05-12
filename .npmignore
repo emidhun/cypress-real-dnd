@@ -1,0 +1,6 @@
+.github/
+examples/
+cypress/
+node_modules/
+*.log
+.DS_Store
