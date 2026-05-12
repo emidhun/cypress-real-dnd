@@ -1,0 +1,75 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  example-react-dnd:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Cypress 14 is on Electron 130, 15 is on Electron 138 — both Chromium
+        # versions support Input.dispatchDragEvent so coverage is meaningful.
+        cypress: ["^14", "^15"]
+        # Chrome runs alongside Electron to verify the lsof-based port
+        # discovery + AUT iframe translation works on both browser families.
+        browser: [electron, chrome]
+    name: "Cypress ${{ matrix.cypress }} / ${{ matrix.browser }}"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          # No cache: this repo has two package.json files (root + example)
+          # and matrix-pinned Cypress versions; npm's cache key would miss.
+
+      # 1. Install the plugin's own deps (chrome-remote-interface). Required
+      #    so the `file:../..` link from the example resolves transitively.
+      - name: Install plugin deps
+        run: npm install
+
+      # 2. Install the example app's deps.
+      - name: Install example deps
+        working-directory: examples/react-dnd
+        run: npm install
+
+      # 3. Pin Cypress to the matrix version. Overrides the example's
+      #    `cypress: ^15` so we exercise both supported majors.
+      - name: Pin Cypress version
+        working-directory: examples/react-dnd
+        run: npm install --no-save cypress@${{ matrix.cypress }}
+
+      # 4. Start the Vite dev server in the background; wait until it's up.
+      - name: Start example app (background)
+        working-directory: examples/react-dnd
+        run: |
+          nohup npm run dev > /tmp/vite.log 2>&1 &
+          for i in {1..30}; do
+            if curl -fsS http://localhost:5173/ > /dev/null; then
+              echo "vite up after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "vite did not start within 30s"; tail /tmp/vite.log; exit 1
+
+      # 5. Run the Cypress suite headless against the dev server.
+      - name: Run Cypress
+        working-directory: examples/react-dnd
+        run: npx cypress run --browser ${{ matrix.browser }} --headless
+
+      - name: Upload Cypress artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-artifacts-${{ matrix.cypress }}-${{ matrix.browser }}
+          path: |
+            examples/react-dnd/cypress/screenshots
+            examples/react-dnd/cypress/videos
+            /tmp/vite.log
+          retention-days: 7
+          if-no-files-found: ignore

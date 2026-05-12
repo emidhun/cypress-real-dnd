@@ -1,0 +1,26 @@
+{
+  "name": "cypress-real-dnd-example-react-dnd",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Self-test example: a ToolJet-style sidebar+canvas built with react-dnd, used to verify the plugin works outside its parent project.",
+  "scripts": {
+    "dev": "vite --port 5173 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5173 --strictPort",
+    "cy:run": "cypress run --browser electron --headless",
+    "cy:open": "cypress open"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-dnd": "^16.0.1",
+    "react-dnd-html5-backend": "^16.0.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "cypress": "^15.0.0",
+    "cypress-real-dnd": "file:../..",
+    "vite": "^5.4.10"
+  }
+}

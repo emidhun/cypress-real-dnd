@@ -34,16 +34,19 @@
 
 // Position keywords mirror cypress-real-events' `position` option so users
 // can move between the two plugins without re-learning the API.
+// A 1px inset on the right/bottom edges keeps drops inside the element's
+// hit-test box — CSS treats `right` and `bottom` as exclusive, so a literal
+// corner coord lands on the next element underneath.
 const POSITION_KEYWORDS = {
-  topLeft:     (r) => [0,         0],
-  top:         (r) => [r.width/2, 0],
-  topRight:    (r) => [r.width,   0],
-  left:        (r) => [0,         r.height/2],
-  center:      (r) => [r.width/2, r.height/2],
-  right:       (r) => [r.width,   r.height/2],
-  bottomLeft:  (r) => [0,         r.height],
-  bottom:      (r) => [r.width/2, r.height],
-  bottomRight: (r) => [r.width,   r.height],
+  topLeft:     (r) => [0,             0],
+  top:         (r) => [r.width / 2,   0],
+  topRight:    (r) => [r.width - 1,   0],
+  left:        (r) => [0,             r.height / 2],
+  center:      (r) => [r.width / 2,   r.height / 2],
+  right:       (r) => [r.width - 1,   r.height / 2],
+  bottomLeft:  (r) => [0,             r.height - 1],
+  bottom:      (r) => [r.width / 2,   r.height - 1],
+  bottomRight: (r) => [r.width - 1,   r.height - 1],
 };
 
 function resolveOffset(rect, position, explicitX, explicitY) {

@@ -1,4 +1,5 @@
 node_modules/
+examples/*/node_modules/
 *.log
 .DS_Store
 coverage/
@@ -6,4 +7,9 @@ dist/
 cypress/screenshots/
 cypress/videos/
 cypress/downloads/
+examples/*/cypress/screenshots/
+examples/*/cypress/videos/
+examples/*/cypress/downloads/
+package-lock.json
+examples/*/package-lock.json
 docs/
