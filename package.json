@@ -7,15 +7,21 @@
   "exports": {
     ".": {
       "types": "./types/index.d.ts",
-      "require": "./src/index.js"
+      "require": "./src/index.js",
+      "import": "./src/index.js",
+      "default": "./src/index.js"
     },
     "./plugin": {
       "types": "./types/plugin.d.ts",
-      "require": "./src/plugin.js"
+      "require": "./src/plugin.js",
+      "import": "./src/plugin.js",
+      "default": "./src/plugin.js"
     },
     "./commands": {
       "types": "./types/commands.d.ts",
-      "require": "./src/commands.js"
+      "require": "./src/commands.js",
+      "import": "./src/commands.js",
+      "default": "./src/commands.js"
     }
   },
   "files": [
