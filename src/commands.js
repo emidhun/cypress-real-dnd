@@ -1,12 +1,12 @@
 /**
- * cypress-real-drag-drop / commands
+ * cypress-real-dnd / commands
  *
  * Browser-side Cypress commands. Import this from your support file once and
  * the `cy.realDragAndDrop` + `cy.realDrag` commands become available
  * everywhere.
  *
  *   // cypress/support/e2e.js
- *   import 'cypress-real-drag-drop/commands';
+ *   import 'cypress-real-dnd/commands';
  *
  * Usage:
  *

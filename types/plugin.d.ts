@@ -3,7 +3,7 @@
  * (`cdpRealDrag`, `cdpRealDragInit`).
  *
  * @example
- *   const { realDragDropPlugin } = require('cypress-real-drag-drop/plugin');
+ *   const { realDragDropPlugin } = require('cypress-real-dnd/plugin');
  *   module.exports = defineConfig({
  *     e2e: {
  *       setupNodeEvents(on) { realDragDropPlugin(on); }

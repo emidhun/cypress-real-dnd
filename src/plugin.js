@@ -1,5 +1,5 @@
 /**
- * cypress-real-drag-drop / plugin
+ * cypress-real-dnd / plugin
  *
  * Node-side plugin. Registers two Cypress tasks:
  *   - `cdpRealDragInit` — call once in `before()` to settle Cypress's CDP
@@ -108,7 +108,7 @@ async function getClient() {
     debuggerPort = await discoverDebuggerPort();
     if (!debuggerPort) {
       throw new Error(
-        "[cypress-real-drag-drop] Could not discover the browser's CDP port. " +
+        "[cypress-real-dnd] Could not discover the browser's CDP port. " +
           "On Windows / sandboxed envs, set REMOTE_DEBUGGING_PORT in launchOptions.",
       );
     }
@@ -133,7 +133,7 @@ async function getClient() {
       );
     if (!autTarget) {
       throw new Error(
-        `[cypress-real-drag-drop] No suitable CDP target. Saw: ${JSON.stringify(
+        `[cypress-real-dnd] No suitable CDP target. Saw: ${JSON.stringify(
           targets.map((t) => ({ type: t.type, url: t.url })),
         )}`,
       );
@@ -158,7 +158,7 @@ async function waitForDragData() {
   }
   if (!lastDragData) {
     throw new Error(
-      "[cypress-real-drag-drop] No Input.dragIntercepted event after the " +
+      "[cypress-real-dnd] No Input.dragIntercepted event after the " +
         "mouse-move past threshold. The source element may not be a real " +
         "HTML5 draggable (check `draggable=true` on the element or its " +
         "react-dnd connector target).",
@@ -301,7 +301,7 @@ async function realDragInit() {
 /**
  * Register hooks + tasks with Cypress's setupNodeEvents.
  *
- *   const { realDragDropPlugin } = require('cypress-real-drag-drop/plugin');
+ *   const { realDragDropPlugin } = require('cypress-real-dnd/plugin');
  *   module.exports = defineConfig({
  *     e2e: {
  *       setupNodeEvents(on, config) {

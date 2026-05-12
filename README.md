@@ -1,6 +1,8 @@
-# cypress-real-drag-drop
+# cypress-real-dnd
 
 Real HTML5 drag-and-drop for Cypress, driven by Chrome DevTools Protocol.
+
+Companion to [`cypress-real-events`](https://github.com/dmtrKovalenko/cypress-real-events) — that one does mouse/keyboard, this does drag.
 
 Works out of the box with:
 - [`react-dnd`](https://github.com/react-dnd/react-dnd) (html5 backend)
@@ -21,7 +23,7 @@ The only path to a real drag in Cypress is what Puppeteer does: enable CDP drag 
 ## Install
 
 ```bash
-npm install --save-dev cypress-real-drag-drop
+npm install --save-dev cypress-real-dnd
 ```
 
 ## Setup
@@ -30,7 +32,7 @@ npm install --save-dev cypress-real-drag-drop
 
 ```js
 const { defineConfig } = require("cypress");
-const { realDragDropPlugin } = require("cypress-real-drag-drop/plugin");
+const { realDragDropPlugin } = require("cypress-real-dnd/plugin");
 
 module.exports = defineConfig({
   e2e: {
@@ -45,7 +47,7 @@ module.exports = defineConfig({
 **2. Install the commands in `cypress/support/e2e.js`:**
 
 ```js
-import "cypress-real-drag-drop/commands";
+import "cypress-real-dnd/commands";
 ```
 
 **3. Settle CDP before any drag fires.** Add this to every spec that uses the helper:
