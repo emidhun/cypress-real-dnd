@@ -44,8 +44,16 @@
     "cdp",
     "chrome-devtools-protocol"
   ],
-  "author": "",
+  "author": "emidhun <midhun752@gmail.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/emidhun/cypress-real-dnd.git"
+  },
+  "bugs": {
+    "url": "https://github.com/emidhun/cypress-real-dnd/issues"
+  },
+  "homepage": "https://github.com/emidhun/cypress-real-dnd#readme",
   "peerDependencies": {
     "cypress": ">=12"
   },
