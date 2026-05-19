@@ -176,6 +176,12 @@ async function realDrag({ fromX, fromY, toX, toY }) {
   const client = await getClient();
   const { Input, Runtime } = client;
 
+  // Re-arm interceptDrags on every call. Heavy Cypress operations between
+  // drags — cy.visit, cy.intercept's automation hooks, snapshot capture —
+  // can implicitly clear the renderer's intercept state. Idempotent enable
+  // is cheap (~ms) and saves the auto-retry path from absorbing the cost.
+  await Input.setInterceptDrags({ enabled: true });
+
   // Translate AUT-iframe-relative coords to runner-page viewport coords.
   // Cypress displays the AUT iframe scaled to fit between its UI panels;
   // we look up the iframe's displayed rect and the AUT's own innerWidth /

@@ -157,7 +157,8 @@ Initialize the CDP client and arm `Input.setInterceptDrags` ahead of the first t
    - `Input.dispatchMouseEvent` fires a real mousedown + moves past the drag threshold
    - Chromium initiates a real HTML5 drag and emits `Input.dragIntercepted` with `DragData`
    - The plugin replays `dragEnter → dragOver → dragOver → drop → mouseup` at the target via `Input.dispatchDragEvent`
-4. **Auto-retry on first miss.** If the first attempt loses its intercept (Cypress's CDP listeners still settling), the plugin re-arms and retries once.
+4. **Per-call re-arm.** `Input.setInterceptDrags(true)` is called again at the top of every drag. Heavy Cypress operations between drags — `cy.visit`, `cy.intercept`'s automation hooks, snapshot capture — can implicitly clear the renderer's intercept state; the idempotent re-arm is cheap and keeps each drag self-sufficient.
+5. **Auto-retry on first miss.** If a drag still loses its intercept (typically the first call after browser launch, before Cypress's CDP listeners settle), the plugin re-arms and retries once.
 
 ## Limitations
 
