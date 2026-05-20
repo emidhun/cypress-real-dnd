@@ -72,17 +72,17 @@ import "cypress-real-dnd/commands";
 
 ```js
 before(() => {
-  cy.task("cdpRealDragInit");
+  cy.realDragInit();
 });
 ```
 
-> The first drag of a spec run can miss its CDP intercept — Cypress's own CDP listeners are still settling during that window. `cdpRealDragInit` burns that slot so your tests start from a stable state. The plugin also runs a per-call re-arm + a one-shot auto-retry as safety nets, but skipping `cdpRealDragInit` makes the first drag pay an extra ~300ms recovery on the retry path. **Recommended on every spec.**
+> The first drag of a spec run can miss its CDP intercept — Cypress's own CDP listeners are still settling during that window. `cy.realDragInit()` attaches the CDP client and runs a ~2s warmup (mouse cycle + tail sleep) while Cypress is quiet, so the first user-issued drag lands on a stable pipeline. The same warmup is baked into the first drag call as a fallback, plus a per-call re-arm and a one-shot auto-retry — so skipping `realDragInit()` shifts the warmup cost into your first `it()` rather than failing it. **Recommended on every spec.**
 
 ## Usage
 
 ```js
 describe("Kanban board", () => {
-  before(() => cy.task("cdpRealDragInit"));
+  before(() => cy.realDragInit());
 
   it("moves a card", () => {
     cy.realDragAndDrop("[data-cy=card-1]", "[data-cy=column-done]");
@@ -148,9 +148,13 @@ cy.realDragAndDrop('[data-cy=card]', '[data-cy=canvas]', {
 
 Drag between explicit AUT-relative coords.
 
+### `cy.realDragInit()`
+
+One-time CDP settle hook. Call from a `before()` so the plugin attaches its CDP client, arms `Input.setInterceptDrags`, and runs a ~2s warmup (off-canvas mouse cycle + tail sleep) while Cypress is quiet. Subsequent `cy.realDragAndDrop` / `cy.realDrag` calls inherit the cached client. The warmup also runs lazily on the first task call if you skip this, but the explicit init gives the most reliable first drag on busy SPAs.
+
 ### `cy.task("cdpRealDragInit")`
 
-Initialize the CDP client and arm `Input.setInterceptDrags` ahead of the first test. Call once per spec from `before()`.
+Underlying Node-side task that `cy.realDragInit()` wraps. Use only if you need to bypass the browser-side command (e.g. in a custom plugin pipeline).
 
 ## How it works
 
@@ -161,8 +165,9 @@ Initialize the CDP client and arm `Input.setInterceptDrags` ahead of the first t
    - `Input.dispatchMouseEvent` fires a real mousedown + moves past the drag threshold
    - Chromium initiates a real HTML5 drag and emits `Input.dragIntercepted` with `DragData`
    - The plugin replays `dragEnter → dragOver → dragOver → drop → mouseup` at the target via `Input.dispatchDragEvent`
-4. **Per-call re-arm.** `Input.setInterceptDrags(true)` is called again at the top of every drag. Heavy Cypress operations between drags — `cy.visit`, `cy.intercept`'s automation hooks, snapshot capture — can implicitly clear the renderer's intercept state; the idempotent re-arm is cheap and keeps each drag self-sufficient.
-5. **Auto-retry on first miss.** If a drag still loses its intercept (typically the first call after browser launch, before Cypress's CDP listeners settle), the plugin re-arms and retries once.
+4. **First-call warmup.** When the CDP client first attaches, the plugin dispatches a harmless off-canvas mouse press/move/release cycle, re-arms `Input.setInterceptDrags`, then sleeps ~1.5s. This burns the window during which Cypress's own CDP listeners are still settling — without it, the first real drag of a spec consistently loses its intercept on busier setups. Total warmup is ~2s, paid once per spec run.
+5. **Per-call re-arm.** `Input.setInterceptDrags(true)` is called again at the top of every drag. Heavy Cypress operations between drags — `cy.visit`, `cy.intercept`'s automation hooks, snapshot capture — can implicitly clear the renderer's intercept state; the idempotent re-arm is cheap and keeps each drag self-sufficient.
+6. **Auto-retry on first miss.** If a drag still loses its intercept after warmup + re-arm, the plugin re-arms and retries the drag once before bubbling the failure.
 
 ## Compatibility
 
@@ -174,7 +179,7 @@ Initialize the CDP client and arm `Input.setInterceptDrags` ahead of the first t
 
 - **Chromium-family only.** Firefox and WebKit don't expose CDP and are not supported.
 - **POSIX port discovery.** The `lsof` path is macOS/Linux. Windows currently falls back to a TCP sweep of the dynamic range — works but slower.
-- **`cdpRealDragInit` in `before()` is strongly recommended.** Skipping it is no longer fatal (per-call re-arm + auto-retry land the drag), but the first call pays a recovery latency.
+- **`cy.realDragInit()` in `before()` is strongly recommended.** Skipping it isn't fatal — the same warmup runs lazily on the first task call — but the warmup cost (~2s) shifts into your first `it()` rather than the `before()` block, and the first drag is more exposed to races with `cy.visit` / `cy.intercept` traffic.
 
 ## License
 
