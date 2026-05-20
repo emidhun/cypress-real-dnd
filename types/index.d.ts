@@ -49,8 +49,8 @@ declare namespace Cypress {
      * `dnd-kit`'s html5 sensor, and any plain HTML5 `draggable="true"`
      * element, where synthetic-event plugins do not.
      *
-     * Pair with `cy.task('cdpRealDragInit')` in a `before()` hook so the
-     * first drag of the spec lands on a settled CDP state.
+     * Pair with `cy.realDragInit()` in a `before()` hook so the first drag
+     * of the spec lands on a settled CDP state.
      *
      * @example
      *   // Center → center (default)
@@ -83,5 +83,21 @@ declare namespace Cypress {
      *   cy.realDrag({ fromX: 100, fromY: 200, toX: 600, toY: 400 });
      */
     realDrag(coords: RealDragCoords): Chainable<void>;
+
+    /**
+     * One-time CDP settle hook. Call from a `before()` block so the plugin
+     * attaches its CDP client and arms `Input.setInterceptDrags` while
+     * Cypress's own CDP traffic is quiet — before any `cy.visit` /
+     * `cy.intercept` / route stubbing kicks off the automation channels
+     * that would otherwise race the first real drag.
+     *
+     * Without this, the first drag of a spec run consistently loses its
+     * intercept on busier setups. The plugin still has an auto-retry path,
+     * but the explicit init is the reliable signal.
+     *
+     * @example
+     *   before(() => cy.realDragInit());
+     */
+    realDragInit(): Chainable<void>;
   }
 }

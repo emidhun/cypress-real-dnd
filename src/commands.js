@@ -135,3 +135,20 @@ Cypress.Commands.add(
 Cypress.Commands.add("realDrag", (coords) => {
   cy.task("cdpRealDrag", coords, { timeout: 15000 });
 });
+
+/**
+ * One-time settle hook. Call from a `before()` so the CDP client attaches +
+ * arms `Input.setInterceptDrags` while Cypress's own CDP traffic is quiet —
+ * before any `cy.visit` / `cy.intercept` / route stubbing kicks off the
+ * automation/snapshot channels that would otherwise race the first real drag.
+ *
+ *   before(() => cy.realDragInit());
+ *
+ * Without this, the first drag of a spec run consistently loses its
+ * intercept on busier setups (e.g. SPA-heavy apps loaded via cy.visit). The
+ * plugin still falls back to an auto-retry path, but the explicit init is
+ * the reliable signal.
+ */
+Cypress.Commands.add("realDragInit", () => {
+  cy.task("cdpRealDragInit", null, { timeout: 30000 });
+});

@@ -146,6 +146,45 @@ async function getClient() {
     });
     await Input.setInterceptDrags({ enabled: true });
     await sleep(300);
+
+    // Warmup: dispatch a no-op mouse press/move/release off-canvas, then
+    // re-arm interceptDrags. Empirically the very first real drag after
+    // browser launch loses its intercept — Cypress's own CDP listeners are
+    // still settling during the first ~1s and silently absorb our
+    // dragIntercept arm. Burning that window with a harmless mouse cycle
+    // before the first user-issued drag lands the next real drag on a
+    // stable pipeline. Cost is ~750ms, paid once per spec run.
+    try {
+      await Input.dispatchMouseEvent({
+        type: "mousePressed",
+        x: 1,
+        y: 1,
+        button: "left",
+        clickCount: 1,
+      });
+      await Input.dispatchMouseEvent({
+        type: "mouseMoved",
+        x: 20,
+        y: 20,
+        button: "left",
+      });
+      await sleep(100);
+      await Input.dispatchMouseEvent({
+        type: "mouseReleased",
+        x: 20,
+        y: 20,
+        button: "left",
+      });
+      await sleep(200);
+      await Input.setInterceptDrags({ enabled: true });
+      // Long tail sleep so Cypress's automation/snapshot CDP traffic finishes
+      // settling before the first real user-issued drag fires. Matches the
+      // budget the deprecated `cdpRealDragInit` task used to give.
+      await sleep(1500);
+    } catch (_) {
+      // Warmup is best-effort — the auto-retry path still covers a missed
+      // first drag if this fails.
+    }
     return client;
   })();
   return cdpPromise;
