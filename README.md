@@ -1,5 +1,9 @@
 # cypress-real-dnd
 
+[![npm version](https://img.shields.io/npm/v/cypress-real-dnd.svg)](https://www.npmjs.com/package/cypress-real-dnd)
+[![license](https://img.shields.io/npm/l/cypress-real-dnd.svg)](./LICENSE)
+[![CI](https://github.com/emidhun/cypress-real-dnd/actions/workflows/test.yml/badge.svg)](https://github.com/emidhun/cypress-real-dnd/actions/workflows/test.yml)
+
 Real HTML5 drag-and-drop for Cypress, driven by Chrome DevTools Protocol.
 
 ## The problem this solves
@@ -72,7 +76,7 @@ before(() => {
 });
 ```
 
-> The first drag of a spec run consistently misses its CDP intercept — Cypress's own CDP listeners are still settling during that window. `cdpRealDragInit` burns that slot so your tests start from a stable state. **Without it, the first `it()` in the spec will fail.**
+> The first drag of a spec run can miss its CDP intercept — Cypress's own CDP listeners are still settling during that window. `cdpRealDragInit` burns that slot so your tests start from a stable state. The plugin also runs a per-call re-arm + a one-shot auto-retry as safety nets, but skipping `cdpRealDragInit` makes the first drag pay an extra ~300ms recovery on the retry path. **Recommended on every spec.**
 
 ## Usage
 
@@ -160,11 +164,17 @@ Initialize the CDP client and arm `Input.setInterceptDrags` ahead of the first t
 4. **Per-call re-arm.** `Input.setInterceptDrags(true)` is called again at the top of every drag. Heavy Cypress operations between drags — `cy.visit`, `cy.intercept`'s automation hooks, snapshot capture — can implicitly clear the renderer's intercept state; the idempotent re-arm is cheap and keeps each drag self-sufficient.
 5. **Auto-retry on first miss.** If a drag still loses its intercept (typically the first call after browser launch, before Cypress's CDP listeners settle), the plugin re-arms and retries once.
 
+## Compatibility
+
+- **Cypress:** `>=12` (peer dependency). CI verifies against Cypress 14.x and 15.x on both Electron and Chrome.
+- **Node:** `>=18`.
+- **Browsers:** Chromium-family only — Electron and Chrome.
+
 ## Limitations
 
-- **Chromium-family only.** Electron and Chrome work. Firefox and WebKit don't expose CDP and are not supported.
+- **Chromium-family only.** Firefox and WebKit don't expose CDP and are not supported.
 - **POSIX port discovery.** The `lsof` path is macOS/Linux. Windows currently falls back to a TCP sweep of the dynamic range — works but slower.
-- **`cdpRealDragInit` in `before()` is required.** Without it the first drag of a spec fails (see Setup above).
+- **`cdpRealDragInit` in `before()` is strongly recommended.** Skipping it is no longer fatal (per-call re-arm + auto-retry land the drag), but the first call pays a recovery latency.
 
 ## License
 
