@@ -88,6 +88,9 @@ jobs:
         with:
           method: chat.postMessage
           token: ${{ secrets.SLACK_BOT_TOKEN }}
+          # Fail the step (and surface the Slack API error) instead of
+          # silently swallowing ok:false responses like not_in_channel.
+          errors: true
           payload: |
             channel: "${{ secrets.SLACK_CHANNEL_ID }}"
             text: "Cypress ${{ needs.example-react-dnd.result == 'success' && '✅ passed' || '❌ failed' }} on ${{ github.ref_name }}"
