@@ -73,3 +73,43 @@ jobs:
             /tmp/vite.log
           retention-days: 7
           if-no-files-found: ignore
+
+  # Post a single summary to Slack after the whole matrix finishes, pass or
+  # fail. `if: always()` ensures it runs even when a matrix cell failed;
+  # `needs.example-react-dnd.result` aggregates across all matrix cells
+  # (success only if every cell passed).
+  notify-slack:
+    needs: example-react-dnd
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post result to Slack
+        uses: slackapi/slack-github-action@v2.1.0
+        with:
+          method: chat.postMessage
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          payload: |
+            channel: "${{ secrets.SLACK_CHANNEL_ID }}"
+            text: "Cypress ${{ needs.example-react-dnd.result == 'success' && '✅ passed' || '❌ failed' }} on ${{ github.ref_name }}"
+            blocks:
+              - type: "section"
+                text:
+                  type: "mrkdwn"
+                  text: "${{ needs.example-react-dnd.result == 'success' && ':white_check_mark:' || ':x:' }} *Cypress ${{ needs.example-react-dnd.result }}* — `${{ github.repository }}`"
+              - type: "section"
+                fields:
+                  - type: "mrkdwn"
+                    text: "*Branch:*\n${{ github.ref_name }}"
+                  - type: "mrkdwn"
+                    text: "*Triggered by:*\n${{ github.actor }}"
+                  - type: "mrkdwn"
+                    text: "*Event:*\n${{ github.event_name }}"
+                  - type: "mrkdwn"
+                    text: "*Commit:*\n<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>"
+              - type: "actions"
+                elements:
+                  - type: "button"
+                    text:
+                      type: "plain_text"
+                      text: "View run"
+                    url: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
