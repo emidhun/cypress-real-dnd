@@ -57,31 +57,16 @@ jobs:
           done
           echo "vite did not start within 30s"; tail /tmp/vite.log; exit 1
 
-      # 5. Run the Cypress suite headless against the dev server. The JSON
-      #    reporter writes per-run stats (tests/passes/failures/duration) to
-      #    results.json — the suite is a single spec, so there's no per-spec
-      #    overwrite to merge.
+      # 5. Run the Cypress suite headless against the dev server, via the
+      #    module API (cy-ci-run.cjs) so we capture real result counts and
+      #    write summary.json for the notify-slack job. Exits non-zero on any
+      #    test failure, so a failed cell still goes red.
       - name: Run Cypress
-        id: cypress
         working-directory: examples/react-dnd
-        run: |
-          npx cypress run --browser ${{ matrix.browser }} --headless \
-            --reporter json --reporter-options "output=results.json"
-
-      # 6. Distil the report into a small summary the notify-slack job can
-      #    aggregate. Runs even on failure so failed cells still report counts;
-      #    falls back to a null-stats summary if Cypress crashed before writing.
-      - name: Build run summary
-        if: always()
-        working-directory: examples/react-dnd
-        run: |
-          if [ -f results.json ]; then
-            jq -c '{cell: "Cypress ${{ matrix.cypress }} / ${{ matrix.browser }}", result: "${{ steps.cypress.outcome }}", stats: .stats}' results.json > summary.json
-          else
-            printf '{"cell":"Cypress %s / %s","result":"%s","stats":null}\n' \
-              '${{ matrix.cypress }}' '${{ matrix.browser }}' '${{ steps.cypress.outcome }}' > summary.json
-          fi
-          cat summary.json
+        env:
+          BROWSER: ${{ matrix.browser }}
+          CELL: "Cypress ${{ matrix.cypress }} / ${{ matrix.browser }}"
+        run: node cy-ci-run.cjs
 
       - name: Upload run summary
         if: always()
