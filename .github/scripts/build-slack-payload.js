@@ -66,12 +66,13 @@ const lines = cells.map((c) => {
 const passed = env.OVERALL === "success";
 // Coloured bar down the left of the attachment — instant green/red signal.
 const color = passed ? "#2eb67d" : "#e01e5a";
-const headline = `${passed ? "✅" : "❌"} Cypress ${passed ? "passed" : "failed"} on ${env.BRANCH}`;
+const statusIcon = passed ? "✅" : "❌";
+const statusWord = passed ? "Passed" : "Failed";
 const breakdown = lines.length ? lines.join("\n") : "_No cell summaries found._";
 
 const totalsLine =
-  `*${totals.passes}/${totals.tests}* passed` +
-  (totals.failures ? ` · *${totals.failures}* failed` : "") +
+  `*${totals.passes}/${totals.tests}* tests passed` +
+  (totals.failures ? ` · *${totals.failures} failed*` : "") +
   (totals.pending ? ` · ${totals.pending} pending` : "") +
   ` · ⏱ ${fmtDuration(totals.duration)}`;
 
@@ -79,55 +80,90 @@ const commitUrl = `${env.SERVER_URL}/${env.REPO}/commit/${env.SHA}`;
 const runUrl = `${env.SERVER_URL}/${env.REPO}/actions/runs/${env.RUN_ID}`;
 const shortSha = String(env.SHA || "").slice(0, 7);
 
+const isPR = env.EVENT === "pull_request" && env.PR_NUMBER;
+const branch = (isPR && env.PR_BRANCH) || env.BRANCH;
+
+// The headline block answers "did this PR pass?" — bold, linked PR title up
+// top so the result is scannable in the channel without opening anything.
+const subjectBlock = isPR
+  ? {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*<${env.PR_URL}|${env.PR_TITLE}>*  ·  <${env.PR_URL}|#${env.PR_NUMBER}>`,
+      },
+    }
+  : {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*Push to \`${branch}\`*  ·  <${commitUrl}|${shortSha}>`,
+      },
+    };
+
+// Action buttons: jump straight to the PR (when relevant) and the run logs.
+const buttons = [];
+if (isPR) {
+  buttons.push({
+    type: "button",
+    text: { type: "plain_text", emoji: true, text: "📋 View PR" },
+    url: env.PR_URL,
+    style: passed ? "primary" : "danger",
+  });
+}
+buttons.push({
+  type: "button",
+  text: { type: "plain_text", emoji: true, text: "🔍 View run" },
+  url: runUrl,
+  ...(isPR ? {} : { style: passed ? "primary" : "danger" }),
+});
+
+const subjectText = isPR
+  ? `PR #${env.PR_NUMBER}: ${env.PR_TITLE}`
+  : `Push to ${branch}`;
+
 // Everything lives inside one coloured attachment so the bar spans the
 // whole message. The header block gives a big, scannable status line.
 const payload = {
   channel: env.CHANNEL,
-  text: `Cypress ${passed ? "passed" : "failed"} on ${env.BRANCH} — ${totals.passes}/${totals.tests} passed`,
+  text: `${statusIcon} Cypress ${statusWord} — ${subjectText} (${totals.passes}/${totals.tests} passed)`,
   attachments: [
     {
       color,
       blocks: [
         {
           type: "header",
-          text: { type: "plain_text", emoji: true, text: headline },
+          text: {
+            type: "plain_text",
+            emoji: true,
+            text: `${statusIcon} Cypress ${statusWord}`,
+          },
         },
+        subjectBlock,
         {
-          type: "section",
-          text: { type: "mrkdwn", text: `\`${env.REPO}\`\n${totalsLine}` },
+          type: "context",
+          elements: [
+            { type: "mrkdwn", text: `📦 \`${env.REPO}\`` },
+            { type: "mrkdwn", text: `🌿 \`${branch}\`` },
+            { type: "mrkdwn", text: `👤 ${env.ACTOR}` },
+          ],
         },
         { type: "divider" },
+        {
+          type: "section",
+          text: { type: "mrkdwn", text: totalsLine },
+        },
         {
           type: "section",
           text: { type: "mrkdwn", text: `*Results by browser*\n${breakdown}` },
         },
-        { type: "divider" },
-        {
-          type: "section",
-          fields: [
-            { type: "mrkdwn", text: `*Branch*\n${env.BRANCH}` },
-            { type: "mrkdwn", text: `*Triggered by*\n${env.ACTOR}` },
-            { type: "mrkdwn", text: `*Event*\n${env.EVENT}` },
-            { type: "mrkdwn", text: `*Commit*\n<${commitUrl}|${shortSha}>` },
-          ],
-        },
-        {
-          type: "actions",
-          elements: [
-            {
-              type: "button",
-              text: { type: "plain_text", emoji: true, text: "🔍 View run" },
-              url: runUrl,
-              style: passed ? "primary" : "danger",
-            },
-          ],
-        },
+        { type: "actions", elements: buttons },
         {
           type: "context",
           elements: [
             {
               type: "mrkdwn",
-              text: `${env.REPO} • run <${runUrl}|#${env.RUN_ID}>`,
+              text: `Commit <${commitUrl}|${shortSha}> • run <${runUrl}|#${env.RUN_ID}>`,
             },
           ],
         },
