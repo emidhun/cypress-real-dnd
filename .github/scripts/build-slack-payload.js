@@ -45,22 +45,32 @@ function fmtDuration(ms) {
 const cells = loadCells();
 
 const totals = { tests: 0, passes: 0, failures: 0, pending: 0, duration: 0 };
-const lines = cells.map((c) => {
+for (const c of cells) {
   const s = c.stats;
-  if (!s) {
-    return `:warning: *${c.cell}* — no results (run crashed before reporting)`;
-  }
+  if (!s) continue;
   totals.tests += s.tests || 0;
   totals.passes += s.passes || 0;
   totals.failures += s.failures || 0;
   totals.pending += s.pending || 0;
   totals.duration += s.duration || 0;
-  const icon = (s.failures || 0) > 0 ? ":x:" : ":white_check_mark:";
-  const parts = [`${s.passes || 0} passed`];
-  if (s.failures) parts.push(`${s.failures} failed`);
-  if (s.pending) parts.push(`${s.pending} pending`);
-  parts.push(fmtDuration(s.duration));
-  return `${icon} *${c.cell}* — ${parts.join(" · ")}`;
+}
+
+// Render the per-browser results as an aligned, monospaced code block. Code
+// blocks don't render emoji shortcodes, so use PASS/FAIL/WARN status columns;
+// failures (and pendings) are shown inline next to the passed count.
+const nameWidth = cells.length
+  ? Math.max(...cells.map((c) => String(c.cell).length))
+  : 0;
+const rows = cells.map((c) => {
+  const s = c.stats;
+  const name = String(c.cell).padEnd(nameWidth);
+  if (!s) return `WARN  ${name}  no results (run crashed)`;
+  const status = (s.failures || 0) > 0 ? "FAIL" : "PASS";
+  let detail = `${s.passes || 0} passed`;
+  if (s.failures) detail += `, ${s.failures} failed`;
+  if (s.pending) detail += `, ${s.pending} pending`;
+  detail += `  (${fmtDuration(s.duration)})`;
+  return `${status}  ${name}  ${detail}`;
 });
 
 const passed = env.OVERALL === "success";
@@ -68,7 +78,9 @@ const passed = env.OVERALL === "success";
 const color = passed ? "#2eb67d" : "#e01e5a";
 const statusIcon = passed ? "✅" : "❌";
 const statusWord = passed ? "Passed" : "Failed";
-const breakdown = lines.length ? lines.join("\n") : "_No cell summaries found._";
+const breakdown = rows.length
+  ? "```\n" + rows.join("\n") + "\n```"
+  : "_No cell summaries found._";
 
 const totalsLine =
   `*${totals.passes}/${totals.tests}* tests passed` +
@@ -144,7 +156,6 @@ const payload = {
           type: "context",
           elements: [
             { type: "mrkdwn", text: `📦 \`${env.REPO}\`` },
-            { type: "mrkdwn", text: `🌿 \`${branch}\`` },
             { type: "mrkdwn", text: `👤 ${env.ACTOR}` },
           ],
         },
