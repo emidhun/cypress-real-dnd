@@ -112,6 +112,13 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     steps:
+      # This job runs separately from the matrix, so check out the repo to get
+      # the payload-builder script (sparse — only the scripts dir is needed).
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+          sparse-checkout-cone-mode: false
+
       # Each matrix cell uploaded its own cypress-summary-* artifact. Pull them
       # all in; download-artifact@v4 puts each in its own subdirectory.
       - name: Download run summaries
