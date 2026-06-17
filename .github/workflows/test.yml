@@ -68,6 +68,20 @@ jobs:
           CELL: "Cypress ${{ matrix.cypress }} / ${{ matrix.browser }}"
         run: node cy-ci-run.cjs
 
+      # If a step before/within the run crashed (e.g. a flaky esbuild
+      # ETXTBSY during setup), cy-ci-run.cjs never wrote summary.json. Write a
+      # crash placeholder so this cell still uploads — and shows as a warning
+      # in Slack instead of silently vanishing from the breakdown/totals.
+      - name: Ensure run summary exists
+        if: always()
+        working-directory: examples/react-dnd
+        run: |
+          if [ ! -f summary.json ]; then
+            printf '{"cell":"Cypress %s / %s","result":"failure","stats":null}\n' \
+              '${{ matrix.cypress }}' '${{ matrix.browser }}' > summary.json
+          fi
+          cat summary.json
+
       - name: Upload run summary
         if: always()
         uses: actions/upload-artifact@v4
