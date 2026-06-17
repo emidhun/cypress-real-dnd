@@ -55,17 +55,17 @@ for (const c of cells) {
   totals.duration += s.duration || 0;
 }
 
-// Render the per-browser results as an aligned, monospaced code block. Code
-// blocks don't render emoji shortcodes, so use PASS/FAIL/WARN status columns;
-// failures (and pendings) are shown inline next to the passed count.
+// Render the per-browser results as an aligned, monospaced code block. Unicode
+// emoji (✅/❌/⚠️) render inside code blocks; failures (and pendings) are shown
+// inline next to the passed count.
 const nameWidth = cells.length
   ? Math.max(...cells.map((c) => String(c.cell).length))
   : 0;
 const rows = cells.map((c) => {
   const s = c.stats;
   const name = String(c.cell).padEnd(nameWidth);
-  if (!s) return `WARN  ${name}  no results (run crashed)`;
-  const status = (s.failures || 0) > 0 ? "FAIL" : "PASS";
+  if (!s) return `⚠️  ${name}  no results (run crashed)`;
+  const status = (s.failures || 0) > 0 ? "❌" : "✅";
   let detail = `${s.passes || 0} passed`;
   if (s.failures) detail += `, ${s.failures} failed`;
   if (s.pending) detail += `, ${s.pending} pending`;
