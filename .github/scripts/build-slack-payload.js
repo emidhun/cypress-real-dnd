@@ -156,6 +156,7 @@ const payload = {
           type: "context",
           elements: [
             { type: "mrkdwn", text: `📦 \`${env.REPO}\`` },
+            { type: "mrkdwn", text: `🌿 \`${branch}\`` },
             { type: "mrkdwn", text: `👤 ${env.ACTOR}` },
           ],
         },
