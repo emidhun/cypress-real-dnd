@@ -64,50 +64,72 @@ const lines = cells.map((c) => {
 });
 
 const passed = env.OVERALL === "success";
-const headIcon = passed ? ":white_check_mark:" : ":x:";
+// Coloured bar down the left of the attachment — instant green/red signal.
+const color = passed ? "#2eb67d" : "#e01e5a";
+const headline = `${passed ? "✅" : "❌"} Cypress ${passed ? "passed" : "failed"} on ${env.BRANCH}`;
 const breakdown = lines.length ? lines.join("\n") : "_No cell summaries found._";
 
 const totalsLine =
-  `*Totals:* ${totals.passes}/${totals.tests} passed` +
-  (totals.failures ? ` · ${totals.failures} failed` : "") +
+  `*${totals.passes}/${totals.tests}* passed` +
+  (totals.failures ? ` · *${totals.failures}* failed` : "") +
   (totals.pending ? ` · ${totals.pending} pending` : "") +
-  ` · ${fmtDuration(totals.duration)}`;
+  ` · ⏱ ${fmtDuration(totals.duration)}`;
 
 const commitUrl = `${env.SERVER_URL}/${env.REPO}/commit/${env.SHA}`;
 const runUrl = `${env.SERVER_URL}/${env.REPO}/actions/runs/${env.RUN_ID}`;
 const shortSha = String(env.SHA || "").slice(0, 7);
 
+// Everything lives inside one coloured attachment so the bar spans the
+// whole message. The header block gives a big, scannable status line.
 const payload = {
   channel: env.CHANNEL,
   text: `Cypress ${passed ? "passed" : "failed"} on ${env.BRANCH} — ${totals.passes}/${totals.tests} passed`,
-  blocks: [
+  attachments: [
     {
-      type: "section",
-      text: {
-        type: "mrkdwn",
-        text: `${headIcon} *Cypress ${env.OVERALL}* — \`${env.REPO}\`\n${totalsLine}`,
-      },
-    },
-    {
-      type: "section",
-      text: { type: "mrkdwn", text: breakdown },
-    },
-    {
-      type: "section",
-      fields: [
-        { type: "mrkdwn", text: `*Branch:*\n${env.BRANCH}` },
-        { type: "mrkdwn", text: `*Triggered by:*\n${env.ACTOR}` },
-        { type: "mrkdwn", text: `*Event:*\n${env.EVENT}` },
-        { type: "mrkdwn", text: `*Commit:*\n<${commitUrl}|${shortSha}>` },
-      ],
-    },
-    {
-      type: "actions",
-      elements: [
+      color,
+      blocks: [
         {
-          type: "button",
-          text: { type: "plain_text", text: "View run" },
-          url: runUrl,
+          type: "header",
+          text: { type: "plain_text", emoji: true, text: headline },
+        },
+        {
+          type: "section",
+          text: { type: "mrkdwn", text: `\`${env.REPO}\`\n${totalsLine}` },
+        },
+        { type: "divider" },
+        {
+          type: "section",
+          text: { type: "mrkdwn", text: `*Results by browser*\n${breakdown}` },
+        },
+        { type: "divider" },
+        {
+          type: "section",
+          fields: [
+            { type: "mrkdwn", text: `*Branch*\n${env.BRANCH}` },
+            { type: "mrkdwn", text: `*Triggered by*\n${env.ACTOR}` },
+            { type: "mrkdwn", text: `*Event*\n${env.EVENT}` },
+            { type: "mrkdwn", text: `*Commit*\n<${commitUrl}|${shortSha}>` },
+          ],
+        },
+        {
+          type: "actions",
+          elements: [
+            {
+              type: "button",
+              text: { type: "plain_text", emoji: true, text: "🔍 View run" },
+              url: runUrl,
+              style: passed ? "primary" : "danger",
+            },
+          ],
+        },
+        {
+          type: "context",
+          elements: [
+            {
+              type: "mrkdwn",
+              text: `${env.REPO} • run <${runUrl}|#${env.RUN_ID}>`,
+            },
+          ],
         },
       ],
     },
