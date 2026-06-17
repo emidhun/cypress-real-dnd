@@ -57,10 +57,39 @@ jobs:
           done
           echo "vite did not start within 30s"; tail /tmp/vite.log; exit 1
 
-      # 5. Run the Cypress suite headless against the dev server.
+      # 5. Run the Cypress suite headless against the dev server. The JSON
+      #    reporter writes per-run stats (tests/passes/failures/duration) to
+      #    results.json — the suite is a single spec, so there's no per-spec
+      #    overwrite to merge.
       - name: Run Cypress
+        id: cypress
         working-directory: examples/react-dnd
-        run: npx cypress run --browser ${{ matrix.browser }} --headless
+        run: |
+          npx cypress run --browser ${{ matrix.browser }} --headless \
+            --reporter json --reporter-options "output=results.json"
+
+      # 6. Distil the report into a small summary the notify-slack job can
+      #    aggregate. Runs even on failure so failed cells still report counts;
+      #    falls back to a null-stats summary if Cypress crashed before writing.
+      - name: Build run summary
+        if: always()
+        working-directory: examples/react-dnd
+        run: |
+          if [ -f results.json ]; then
+            jq -c '{cell: "Cypress ${{ matrix.cypress }} / ${{ matrix.browser }}", result: "${{ steps.cypress.outcome }}", stats: .stats}' results.json > summary.json
+          else
+            printf '{"cell":"Cypress %s / %s","result":"%s","stats":null}\n' \
+              '${{ matrix.cypress }}' '${{ matrix.browser }}' '${{ steps.cypress.outcome }}' > summary.json
+          fi
+          cat summary.json
+
+      - name: Upload run summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-summary-${{ matrix.cypress }}-${{ matrix.browser }}
+          path: examples/react-dnd/summary.json
+          retention-days: 7
 
       - name: Upload Cypress artifacts on failure
         if: failure()
@@ -83,6 +112,31 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     steps:
+      # Each matrix cell uploaded its own cypress-summary-* artifact. Pull them
+      # all in; download-artifact@v4 puts each in its own subdirectory.
+      - name: Download run summaries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: cypress-summary-*
+          path: summaries
+
+      # Aggregate the per-cell summaries into a complete Block Kit payload
+      # (including a per-cell pass/fail/duration breakdown and totals). Writing
+      # the full JSON to a file sidesteps YAML-interpolation issues with
+      # multi-line, dynamically-built content.
+      - name: Build Slack payload
+        env:
+          CHANNEL: ${{ secrets.SLACK_CHANNEL_ID }}
+          OVERALL: ${{ needs.example-react-dnd.result }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          ACTOR: ${{ github.actor }}
+          EVENT: ${{ github.event_name }}
+          SHA: ${{ github.sha }}
+          SERVER_URL: ${{ github.server_url }}
+          RUN_ID: ${{ github.run_id }}
+        run: node .github/scripts/build-slack-payload.js
+
       - name: Post result to Slack
         uses: slackapi/slack-github-action@v2.1.0
         with:
@@ -91,28 +145,4 @@ jobs:
           # Fail the step (and surface the Slack API error) instead of
           # silently swallowing ok:false responses like not_in_channel.
           errors: true
-          payload: |
-            channel: "${{ secrets.SLACK_CHANNEL_ID }}"
-            text: "Cypress ${{ needs.example-react-dnd.result == 'success' && '✅ passed' || '❌ failed' }} on ${{ github.ref_name }}"
-            blocks:
-              - type: "section"
-                text:
-                  type: "mrkdwn"
-                  text: "${{ needs.example-react-dnd.result == 'success' && ':white_check_mark:' || ':x:' }} *Cypress ${{ needs.example-react-dnd.result }}* — `${{ github.repository }}`"
-              - type: "section"
-                fields:
-                  - type: "mrkdwn"
-                    text: "*Branch:*\n${{ github.ref_name }}"
-                  - type: "mrkdwn"
-                    text: "*Triggered by:*\n${{ github.actor }}"
-                  - type: "mrkdwn"
-                    text: "*Event:*\n${{ github.event_name }}"
-                  - type: "mrkdwn"
-                    text: "*Commit:*\n<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>"
-              - type: "actions"
-                elements:
-                  - type: "button"
-                    text:
-                      type: "plain_text"
-                      text: "View run"
-                    url: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          payload-file-path: payload.json
