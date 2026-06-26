@@ -144,4 +144,24 @@ describe("cypress-real-dnd", { retries: 0 }, () => {
       { targetPosition: "middle" },
     );
   });
+
+  it("cy.realDragRewarm: re-primes after navigation so a cold drag still lands", () => {
+    // Re-navigate to load a fresh document, which leaves the intercept stale
+    // (the "No Input.dragIntercepted" cold-miss scenario this command fixes).
+    cy.visit("/");
+    cy.get('[data-cy="canvas-empty"]').should("be.visible");
+    // Proactively re-prime the pipeline on the freshly-loaded document.
+    cy.realDragRewarm();
+    // A drag fired immediately after the re-warm should land normally.
+    cy.realDragAndDrop('[data-cy="widget-card-button"]', '[data-cy="canvas"]', {
+      targetX: 200,
+      targetY: 160,
+    });
+    cy.get('[data-cy="placed-button"]').then(($el) => {
+      const x = parseInt($el.attr("data-x"), 10);
+      const y = parseInt($el.attr("data-y"), 10);
+      expect(within(200, x), `x near 200 (got ${x})`).to.be.true;
+      expect(within(160, y), `y near 160 (got ${y})`).to.be.true;
+    });
+  });
 });
