@@ -393,6 +393,20 @@ async function realDragInit() {
 }
 
 /**
+ * Force a fresh re-prime of the intercept pipeline on the EXISTING client.
+ * Unlike realDragInit (which is a no-op once the client is cached), this always
+ * re-runs the warmup, so it recovers a stale intercept after an AUT navigation.
+ * Use as an explicit escape hatch before a known-cold drag:
+ *
+ *   beforeEach(() => { cy.visit('/app'); cy.realDragRewarm(); });
+ */
+async function realDragRewarm() {
+  const client = await getClient();
+  await warmupIntercept(client.Input);
+  return { ok: true };
+}
+
+/**
  * Register hooks + tasks with Cypress's setupNodeEvents.
  *
  *   const { realDragDropPlugin } = require('cypress-real-dnd/plugin');
@@ -421,6 +435,7 @@ function realDragDropPlugin(on) {
   on("task", {
     cdpRealDrag: realDrag,
     cdpRealDragInit: realDragInit,
+    cdpRealDragRewarm: realDragRewarm,
   });
 }
 

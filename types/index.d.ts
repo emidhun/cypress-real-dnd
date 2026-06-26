@@ -99,5 +99,16 @@ declare namespace Cypress {
      *   before(() => cy.realDragInit());
      */
     realDragInit(): Chainable<void>;
+
+    /**
+     * Force a fresh re-prime of the drag pipeline on demand. Unlike
+     * `realDragInit` (a no-op once warmed), this always re-runs the warmup, so
+     * it recovers a stale intercept after the AUT navigates. Use before a
+     * known-cold drag to fix a flaky "No Input.dragIntercepted" failure.
+     *
+     * @example
+     *   beforeEach(() => { cy.visit('/app'); cy.realDragRewarm(); });
+     */
+    realDragRewarm(): Chainable<void>;
   }
 }
