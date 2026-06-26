@@ -21,9 +21,11 @@
  * Limitations:
  *   - Chromium-family only (CDP). Electron and Chrome both work; Firefox
  *     and WebKit do not.
- *   - First task call after browser launch tends to miss its intercept — we
- *     auto-retry once and the second attempt always lands. Pair with
- *     `cdpRealDragInit` in `before()` for the cleanest signal.
+ *   - A drag can lose its intercept on the first call after browser launch or
+ *     after an AUT navigation (cy.visit / app reload) — the renderer's
+ *     intercept state is reset. We recover automatically: missed drags are
+ *     retried (bounded) with a full pipeline re-warm between attempts, so no
+ *     test-side retry wrapper is needed.
  *   - The `lsof`-based port discovery is POSIX-only; on Windows fall back to
  *     a TCP probe of common ranges (see `discoverDebuggerPort`).
  */
@@ -38,6 +40,52 @@ const DRAG_INTERCEPT_TIMEOUT_MS = 2000;
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+/**
+ * Re-prime the HTML5 drag-intercept pipeline: a harmless off-canvas mouse
+ * press/move/release cycle, then (re-)arm interceptDrags, then a settle.
+ *
+ * Empirically the renderer's intercept state is reset whenever the AUT
+ * document reloads (cy.visit, app open, route change). The cached CDP client
+ * survives those navigations (its socket stays open), so the once-per-spec
+ * warmup no longer covers the new document and the first drag against it
+ * silently loses its intercept ("No Input.dragIntercepted event"). Re-running
+ * this cycle re-primes the pipeline for the current document.
+ *
+ * Best-effort and idempotent — safe to call any number of times. Used both for
+ * the initial per-client warmup and to recover a cold-missed drag.
+ */
+async function warmupIntercept(Input) {
+  try {
+    await Input.dispatchMouseEvent({
+      type: "mousePressed",
+      x: 1,
+      y: 1,
+      button: "left",
+      clickCount: 1,
+    });
+    await Input.dispatchMouseEvent({
+      type: "mouseMoved",
+      x: 20,
+      y: 20,
+      button: "left",
+    });
+    await sleep(100);
+    await Input.dispatchMouseEvent({
+      type: "mouseReleased",
+      x: 20,
+      y: 20,
+      button: "left",
+    });
+    await sleep(200);
+    await Input.setInterceptDrags({ enabled: true });
+    // Long tail sleep so Cypress's automation/snapshot CDP traffic finishes
+    // settling before the next real drag fires.
+    await sleep(1500);
+  } catch (_) {
+    // Warmup is best-effort — the retry path still covers a missed drag.
+  }
 }
 
 /**
@@ -167,44 +215,11 @@ async function getClient() {
     await Input.setInterceptDrags({ enabled: true });
     await sleep(300);
 
-    // Warmup: dispatch a no-op mouse press/move/release off-canvas, then
-    // re-arm interceptDrags. Empirically the very first real drag after
-    // browser launch loses its intercept — Cypress's own CDP listeners are
-    // still settling during the first ~1s and silently absorb our
-    // dragIntercept arm. Burning that window with a harmless mouse cycle
-    // before the first user-issued drag lands the next real drag on a
-    // stable pipeline. Cost is ~750ms, paid once per spec run.
-    try {
-      await Input.dispatchMouseEvent({
-        type: "mousePressed",
-        x: 1,
-        y: 1,
-        button: "left",
-        clickCount: 1,
-      });
-      await Input.dispatchMouseEvent({
-        type: "mouseMoved",
-        x: 20,
-        y: 20,
-        button: "left",
-      });
-      await sleep(100);
-      await Input.dispatchMouseEvent({
-        type: "mouseReleased",
-        x: 20,
-        y: 20,
-        button: "left",
-      });
-      await sleep(200);
-      await Input.setInterceptDrags({ enabled: true });
-      // Long tail sleep so Cypress's automation/snapshot CDP traffic finishes
-      // settling before the first real user-issued drag fires. Matches the
-      // budget the deprecated `cdpRealDragInit` task used to give.
-      await sleep(1500);
-    } catch (_) {
-      // Warmup is best-effort — the auto-retry path still covers a missed
-      // first drag if this fails.
-    }
+    // Prime the intercept pipeline once for this client. The very first real
+    // drag after browser launch otherwise loses its intercept while Cypress's
+    // own CDP listeners are still settling. (See warmupIntercept.)
+    await warmupIntercept(Input);
+
     return client;
   })();
   return cdpPromise;
@@ -290,9 +305,10 @@ async function realDrag({ fromX, fromY, toX, toY }) {
   toX = Math.round(offX + toX * scaleX);
   toY = Math.round(offY + toY * scaleY);
 
-  // Drag sequence. The first attempt after launch sometimes loses its
-  // intercept — auto-retry once with a fresh intercept arm. This is a
-  // workaround for the Cypress<->CDP timing race documented in README.
+  // Drag sequence. The first drag after browser launch OR after any AUT
+  // navigation can lose its intercept (the renderer's intercept state was
+  // reset and the once-per-client warmup no longer applies). Retry on a missed
+  // intercept, re-priming the pipeline with a full warmup between attempts.
   const runOnce = async () => {
     lastDragData = null;
     await Input.dispatchMouseEvent({
@@ -318,22 +334,35 @@ async function realDrag({ fromX, fromY, toX, toY }) {
     return waitForDragData();
   };
 
+  // Safe to retry: a missed intercept means waitForDragData saw NO
+  // dragIntercepted event — the HTML5 drag never started and nothing was
+  // dropped, so re-attempting cannot double-drop. Bounded so a genuinely
+  // non-draggable source still fails (with the original error) instead of
+  // looping forever.
+  const MAX_DRAG_ATTEMPTS = 4;
   let data;
-  try {
-    data = await runOnce();
-  } catch (_) {
+  let lastErr;
+  for (let attempt = 1; attempt <= MAX_DRAG_ATTEMPTS; attempt++) {
     try {
-      await Input.dispatchMouseEvent({
-        type: "mouseReleased",
-        x: fromX + 25,
-        y: fromY + 25,
-        button: "left",
-      });
-    } catch (_e) {}
-    await Input.setInterceptDrags({ enabled: true });
-    await sleep(300);
-    data = await runOnce();
+      data = await runOnce();
+      break;
+    } catch (err) {
+      lastErr = err;
+      // Release any held button so the next attempt starts from a clean state.
+      try {
+        await Input.dispatchMouseEvent({
+          type: "mouseReleased",
+          x: fromX + 25,
+          y: fromY + 25,
+          button: "left",
+        });
+      } catch (_e) {}
+      // Re-prime the intercept pipeline before retrying (skip after the last
+      // attempt — nothing left to retry).
+      if (attempt < MAX_DRAG_ATTEMPTS) await warmupIntercept(Input);
+    }
   }
+  if (!data) throw lastErr;
 
   await Input.dispatchDragEvent({ type: "dragEnter", x: toX, y: toY, data });
   await Input.dispatchDragEvent({ type: "dragOver", x: toX, y: toY, data });
@@ -360,6 +389,20 @@ async function realDrag({ fromX, fromY, toX, toY }) {
 async function realDragInit() {
   await getClient();
   await sleep(1500);
+  return { ok: true };
+}
+
+/**
+ * Force a fresh re-prime of the intercept pipeline on the EXISTING client.
+ * Unlike realDragInit (which is a no-op once the client is cached), this always
+ * re-runs the warmup, so it recovers a stale intercept after an AUT navigation.
+ * Use as an explicit escape hatch before a known-cold drag:
+ *
+ *   beforeEach(() => { cy.visit('/app'); cy.realDragRewarm(); });
+ */
+async function realDragRewarm() {
+  const client = await getClient();
+  await warmupIntercept(client.Input);
   return { ok: true };
 }
 
@@ -392,6 +435,7 @@ function realDragDropPlugin(on) {
   on("task", {
     cdpRealDrag: realDrag,
     cdpRealDragInit: realDragInit,
+    cdpRealDragRewarm: realDragRewarm,
   });
 }
 

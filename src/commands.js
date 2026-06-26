@@ -152,3 +152,21 @@ Cypress.Commands.add("realDrag", (coords) => {
 Cypress.Commands.add("realDragInit", () => {
   cy.task("cdpRealDragInit", null, { timeout: 30000 });
 });
+
+/**
+ * Force a fresh re-prime of the drag pipeline on demand. Unlike `realDragInit`
+ * (a no-op once the client is warmed), this always re-runs the warmup — so it
+ * recovers a stale intercept after the AUT navigates. Drop it in right before a
+ * known-cold drag to fix a flaky "No Input.dragIntercepted" failure:
+ *
+ *   beforeEach(() => {
+ *     cy.visit('/app');     // or app create + open
+ *     cy.realDragRewarm();  // re-prime for the freshly-loaded document
+ *   });
+ *
+ * Not normally required — `realDragAndDrop` already retries with a re-warm on a
+ * missed drag. This is an explicit, proactive escape hatch.
+ */
+Cypress.Commands.add("realDragRewarm", () => {
+  cy.task("cdpRealDragRewarm", null, { timeout: 30000 });
+});
