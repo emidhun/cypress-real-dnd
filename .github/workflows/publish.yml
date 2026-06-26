@@ -1,0 +1,58 @@
+name: Publish to npm
+
+# Publishes the package to npm when a GitHub Release is published.
+#
+# The version is taken from the release TAG (a leading "v" is optional), and
+# written into package.json at build time — so you do NOT need to bump
+# package.json before releasing. Just create a release tagged e.g. `0.1.3`
+# (or `v0.1.3`) and this workflow publishes that exact version.
+#
+# Requires repo secret NPM_TOKEN (an npm "Automation" access token).
+
+on:
+  release:
+    types: [published]
+  # Manual fallback: run from the Actions tab and type the version.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (e.g. 0.1.3)"
+        required: true
+
+permissions:
+  contents: read
+  id-token: write # enables npm provenance attestation
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Resolve target version
+        id: ver
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"   # strip optional leading "v"
+          else
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+          if [ -z "$VERSION" ]; then
+            echo "::error::Could not determine version to publish."
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Publishing version: $VERSION"
+
+      - name: Write version into package.json
+        run: npm version "${{ steps.ver.outputs.version }}" --no-git-tag-version --allow-same-version
+
+      - name: Publish to npm
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
