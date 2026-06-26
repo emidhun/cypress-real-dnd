@@ -103,7 +103,27 @@ async function discoverDebuggerPort() {
 }
 
 async function getClient() {
-  if (cdpPromise) return cdpPromise;
+  if (cdpPromise) {
+    try {
+      const cached = await cdpPromise;
+      // Reuse the cached client ONLY while its CDP WebSocket is still OPEN
+      // (ws.readyState === 1). After an AUT navigation (cy.visit / app reload)
+      // Cypress recycles the CDP target and the socket goes to CLOSED (3);
+      // reusing it makes Input.setInterceptDrags throw
+      // "WebSocket is not open: readyState 3 (CLOSED)" — and realDragInit(),
+      // which just awaits this same cached promise, cannot recover. Discard the
+      // dead client here and rebuild a fresh one against the current target.
+      if (cached && cached._ws && cached._ws.readyState === 1) return cached;
+      try {
+        await cached.close();
+      } catch (_) {
+        /* best-effort close of the dead client */
+      }
+    } catch (_) {
+      /* cached promise itself rejected — fall through and rebuild */
+    }
+    cdpPromise = null;
+  }
   if (!debuggerPort) {
     debuggerPort = await discoverDebuggerPort();
     if (!debuggerPort) {
