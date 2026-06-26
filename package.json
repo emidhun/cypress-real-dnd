@@ -1,6 +1,6 @@
 {
   "name": "cypress-real-dnd",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Real HTML5 drag-and-drop for Cypress via Chrome DevTools Protocol. The first Cypress plugin that actually triggers react-dnd, Sortable.js, dnd-kit's html5 sensor, and plain HTML5 draggables — where cypress-drag-drop's synthetic events and cypress-real-events' mouse events do not.",
   "main": "src/index.js",
   "types": "types/index.d.ts",
